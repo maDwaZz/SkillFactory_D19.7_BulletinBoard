@@ -1,0 +1,19 @@
+{% extends 'bulletinboard/default.html' %}
+
+{% block content %}
+<ul class="list-articles">
+	{% for p in posts %}
+		<li><div class="article-panel">
+			<p class="first">Категория: {{p.category}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Автор: {{p.author}}</p>
+			<p class="last">Дата: {{p.creation_time|date:"d-m-Y H:i:s"}}</p>
+		</div>
+			<h2>{{p.title}}</h2>
+				{% autoescape off %}
+					{{p.body|truncatewords:20}}
+				{% endautoescape %}
+			<div class="clear"></div>
+			<p class="link-read-post"><a href="{{ p.get_absolute_url }}">Читать пост</a></p>
+			</li>
+	{% endfor %}
+</ul>
+{% endblock %}

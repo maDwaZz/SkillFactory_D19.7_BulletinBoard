@@ -1,0 +1,11 @@
+{% extends 'bulletinboard/default.html' %}
+
+{% block content %}
+<h1>Удаление отклика</h1>
+<hr>
+<form action="" method="post">
+    {% csrf_token %}
+    <p>Удаляем сообщение "{{ object.text }}"?</p>
+    <input type="submit" value="Удалить" />
+</form>
+{% endblock content %}

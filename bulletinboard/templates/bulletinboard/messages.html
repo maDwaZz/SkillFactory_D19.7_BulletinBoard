@@ -1,0 +1,29 @@
+{% extends 'bulletinboard/index.html' %}
+
+{% block content %}
+<h1>Все отклики</h1>
+<ul class="list-articles">
+	{% for m in messages %}
+		<li><div class="article-panel">
+			<p class="first">Пост: {{m.post.title|truncatewords:10}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+				Автор: {{m.author}}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+				{% if m.is_approved %}
+				Статус: Подтверждено!
+				{% else %}
+				Статус: Ожидает подтверждения...
+				{% endif %}
+					</p>
+			<p class="last">Дата: {{m.creation_time|date:"d-m-Y H:i:s"}}</p>
+		</div>
+					{{m.text}}
+			<div class="clear"></div>
+			{% if not m.is_approved %}
+			<p class="link-read-post"><a href="{% url 'approve_message' message_id=m.id %}">Подтвердить</a></p>
+			{% endif %}
+			<p class="link-read-post"><a href="{% url 'message_delete' pk=m.id %}">Удалить</a></p>
+			</li>
+	{% endfor %}
+</ul>
+{% endblock %}
+
+

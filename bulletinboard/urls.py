@@ -17,5 +17,6 @@ urlpatterns = [
     path('category/<slug:cat_slug>/', PostCategory.as_view(), name='category'),
     path('login/', LoginUser.as_view(), name='login'),
     path('register/', RegisterUser.as_view(), name='register'),
+    path('verify-code/', VerifyCodeView.as_view(), name='verify_code'),
     path('logout/', logout_user, name='logout'),
 ]

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -124,71 +125,77 @@ class RegisterUser(DataMixin, CreateView):
     template_name = 'bulletinboard/register.html'
     success_url = reverse_lazy('login')
 
+    def generate_one_time_code(self, length=10):
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(length))
+
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Регистрация'
         return context
 
     def form_valid(self, form):
-        user = form.save()
-        login(self.request, user)
-        return redirect('home')
+        # Generate a one-time code
+        one_time_code = self.generate_one_time_code()
+
+        # Send the one-time code via email
+        subject = 'Ваш одноразовый код'
+        message = f'Ваш одноразовый код для регистрации: {one_time_code}'
+        from_email = settings.DEFAULT_FROM_EMAIL
+        recipient_list = [form.cleaned_data['email']]
+
+        send_mail(subject, message, from_email, recipient_list)
+
+        # Save the user, but don't log them in yet
+        user = form.save(commit=False)
+        user.set_unusable_password()  # Set an unusable password
+        user.save()
+        self.request.session['register_username'] = user.username
+        self.request.session['register_password'] = form.cleaned_data['password1']
+
+        # Store the one-time code in session for validation
+        self.request.session['one_time_code'] = one_time_code
+
+        return redirect('verify_code')  # Redirect to the page where the user inputs the code
+
+
+class VerifyCodeView(View):
+    template_name = 'bulletinboard/verify_code.html'
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name)
+
+    def post(self, request, *args, **kwargs):
+        entered_code = request.POST.get('one_time_code')
+        stored_code = request.session.get('one_time_code')
+
+        if entered_code == stored_code:
+            # If the code matches, proceed with user registration
+            user = User.objects.get(username=request.session.get('register_username'))
+            user.set_password(request.session.get('register_password'))  # Set the actual password
+            user.save()
+
+            # Log in the user
+            login(request, user)
+
+            # Clear the session data
+            del request.session['one_time_code']
+            del request.session['register_username']
+            del request.session['register_password']
+
+            return redirect('home')
+
+        return render(request, self.template_name, {'error_message': 'Неверный код'})
 
 
 class LoginUser(DataMixin, LoginView):
     form_class = LoginUserForm
     template_name = 'bulletinboard/login.html'
 
-    def generate_one_time_code(self, length=10):
-        alphabet = string.ascii_letters + string.digits
-        return ''.join(secrets.choice(alphabet) for _ in range(length))
-
-
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Авторизация'
         return context
-
-    def form_valid(self, form):
-        def form_valid(self, form):
-            # Call the parent class method to perform the default login logic
-            response = super().form_valid(form)
-
-            # Get the user object after form validation
-            user = form.get_user()
-
-            # Generate a one-time code
-            one_time_code = generate_one_time_code()
-
-            # Create an instance of the OneTimeCode model
-            OneTimeCode.objects.create(one_time_code=one_time_code)
-
-            # Send an email to the user with the one-time code
-            subject = 'Your One-Time Code'
-            message = f'Your one-time code is: {one_time_code}'
-            from_email = settings.DEFAULT_FROM_EMAIL
-            recipient_list = [user.email]
-
-            send_mail(subject, message, from_email, recipient_list)
-
-            # Additional code for one-time code validation
-            username = form.cleaned_data['username']
-            password = form.cleaned_data['password']
-            entered_one_time_code = form.cleaned_data['one_time_code']
-
-            user = authenticate(self.request, username=username, password=password)
-
-            if user is not None:
-                try:
-                    code = OneTimeCode.objects.get(one_time_code=entered_one_time_code)
-                    if code:
-                        login(self.request, user)
-                        code.delete()
-                        return response
-                except OneTimeCode.DoesNotExist:
-                    pass
-
-            return response
 
 
 def logout_user(request):

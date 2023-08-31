@@ -2,6 +2,10 @@
 
 {% block content %}
 <h1>Все отклики</h1>
+    <form action="" method="get">
+        {{ filterset.form.as_p }}
+        <input type="submit" value="Найти" />
+    </form>
 <ul class="list-articles">
 	{% for m in messages %}
 		<li><div class="article-panel">

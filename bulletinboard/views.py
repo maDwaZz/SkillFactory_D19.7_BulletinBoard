@@ -1,16 +1,19 @@
 from django.conf import settings
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth.views import LoginView
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView, CreateView, DeleteView
+from django.views import View
+from django.views.generic import ListView, DetailView, CreateView, DeleteView, UpdateView
 import string
 import secrets
 
+from .filters import MessageFilter
 from .forms import *
 from .models import *
 from .utils import DataMixin
@@ -110,14 +113,17 @@ class ShowMessages(LoginRequiredMixin, DataMixin, ListView):
     template_name = 'bulletinboard/messages.html'
     context_object_name = 'messages'
 
-    def get_context_data(self, *, object_list=None, **kwargs):
-        context = super().get_context_data(**kwargs)
-        c_def = self.get_user_context(title='Все полученные отклики')
-        return context | c_def
-
     def get_queryset(self):
         author_instance, created = Author.objects.get_or_create(user=self.request.user)
-        return Message.objects.filter(post__author_id=author_instance)
+        queryset = super().get_queryset()
+        self.filterset = MessageFilter(self.request.GET, queryset, user=self.request.user)
+        # return Message.objects.filter(post__author_id=author_instance)
+        return self.filterset.qs.filter(post__author=author_instance)
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title='Все полученные отклики', filterset=self.filterset)
+        return context | c_def
 
 
 class RegisterUser(DataMixin, CreateView):
@@ -220,3 +226,51 @@ class MessageDelete(LoginRequiredMixin, DataMixin, DeleteView):
 def message_sent(request):
     context = {'title': 'Отклик успешно отправлен на подтверждение!', 'menu': menu}
     return render(request, template_name='bulletinboard/message_sent.html', context=context)
+
+
+class PostUpdate(LoginRequiredMixin, DataMixin, UpdateView):
+    form_class = AddPostForm
+    model = Post
+    template_name = 'bulletinboard/post_edit.html'
+    permission_required = ('post.change_post',)
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.author.user != self.request.user:
+            return HttpResponseForbidden("У вас нет доступа к редактированию этого поста.")
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.author.user != self.request.user:
+            return HttpResponseForbidden("У вас нет доступа к редактированию этого поста.")
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title='Редактирование поста')
+        return context | c_def
+
+
+class PostDelete(LoginRequiredMixin, DataMixin, DeleteView):
+    model = Post
+    template_name = 'bulletinboard/post_delete.html'
+    success_url = reverse_lazy('home')
+    permission_required = ('post.delete_post',)
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.author.user != self.request.user:
+            return HttpResponseForbidden("У вас нет доступа к удалению этого поста.")
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self.object.author.user != self.request.user:
+            return HttpResponseForbidden("У вас нет доступа к удалению этого поста.")
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(**kwargs)
+        c_def = self.get_user_context(title='Удаление поста')
+        return context | c_def

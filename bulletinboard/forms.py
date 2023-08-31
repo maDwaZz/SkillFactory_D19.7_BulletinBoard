@@ -1,10 +1,6 @@
-from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django import forms
-from django.contrib.auth import login
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.core.exceptions import ValidationError
-from django.shortcuts import redirect
-from django.views import View
 
 from .models import *
 
